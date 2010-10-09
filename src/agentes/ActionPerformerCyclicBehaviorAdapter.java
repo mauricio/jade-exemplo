@@ -23,7 +23,12 @@ public class ActionPerformerCyclicBehaviorAdapter extends CyclicBehaviour {
 			e.printStackTrace();
 			throw new RuntimeException(e);
 		}
-		this.performer.action();
+		try {
+			this.performer.action();
+		} catch (Exception e) {
+			e.printStackTrace();
+			throw new RuntimeException( e );
+		}
 	}
 	
 }

@@ -10,8 +10,10 @@ import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -24,6 +26,8 @@ public class CentralAgent extends CyclicAgent {
 			.synchronizedMap(new HashMap<AID, Taxi>());
 
 	private JLabel[][] tiles = new JLabel[60][];
+	
+	private Set<Posicao> clientesEmEspera = Collections.synchronizedSet( new HashSet<Posicao>() );
 
 	public CentralAgent() {
 		super(TYPE_CENTRAL);
@@ -33,14 +37,22 @@ public class CentralAgent extends CyclicAgent {
 				createAndShowGUI();
 			}
 		});
+		
+		log("Central iniciada");
+		
 	}
 
 	@Override
 	public void action() {
+		
+		for ( Posicao p : this.clientesEmEspera ) {
+			this.handleTaxiRequest(p);
+		}
+		
 		ACLMessage message = receive();
 
 		if (message != null) {
-
+			
 			switch (message.getPerformative()) {
 			case Messages.TAXI_MOVED:
 				try {
@@ -83,7 +95,7 @@ public class CentralAgent extends CyclicAgent {
 			this.taxis.put(sender, taxi);
 		}
 		taxi.setPosicao(movimento.getDestino());
-
+		
 		// Recuperando estado anterior
 		this.tiles[movimento.getOrigem().getLinha()][movimento.getOrigem()
 				.getColuna()].setBackground(new Color(238, 238, 238));
@@ -101,43 +113,49 @@ public class CentralAgent extends CyclicAgent {
 
 	private void handleTaxiRequest(Posicao posicaoCliente) {
 
+		log("Procurando um taxi pra %s", posicaoCliente);
+		
 		this.tiles[posicaoCliente.getLinha()][posicaoCliente.getColuna()]
 				.setBackground(Color.BLACK);
 
-		this.requestCloserTaxi(posicaoCliente);
+		if (  !this.requestCloserTaxi(posicaoCliente) ) {
+			log("Taxi não encontrado - %s", this.taxis);
+			this.clientesEmEspera.add( posicaoCliente );
+		} else {
+			log("Taxi encontrado");
+		}
 
 	}
 
-	private synchronized void requestCloserTaxi(Posicao posicaoCliente) {
+	private boolean requestCloserTaxi(Posicao posicaoCliente) {
 
 		Entry<AID, Taxi> closerTaxi = null;
+		Double distancia = null;
 
 		for (Entry<AID, Taxi> taxi : this.taxis.entrySet()) {
 
-			// TODO criar um método só que faça esse cálculo (mesma lógica) e
-			// mover código para Posicao
-			int x = posicaoCliente.getColuna() > taxi.getValue().getPosicao()
-					.getColuna() ? posicaoCliente.getColuna()
-					- taxi.getValue().getPosicao().getColuna() : taxi
-					.getValue().getPosicao().getColuna()
-					- posicaoCliente.getColuna();
-			int y = posicaoCliente.getLinha() > taxi.getValue().getPosicao()
-					.getLinha() ? posicaoCliente.getLinha()
-					- taxi.getValue().getPosicao().getLinha() : taxi.getValue()
-					.getPosicao().getLinha()
-					- posicaoCliente.getLinha();
+			double novaDistancia = taxi.getValue().getPosicao().distancia(posicaoCliente);
 
-			if (closerTaxi == null
-					|| (!taxi.getValue().isOcupado() && (x + y) < (closerTaxi
-							.getValue().getPosicao().getColuna() + closerTaxi
-							.getValue().getPosicao().getLinha()))) {
+			if ( !taxi.getValue().isOcupado() && (distancia == null || novaDistancia < distancia) ) {
+				distancia = novaDistancia;
 				closerTaxi = taxi;
 			}
-
+						
 		}
 
-		closerTaxi.getValue().setOcupado(true);
+		if ( closerTaxi != null ) {
+			closerTaxi.getValue().setOcupado(true);
+			sendTaxiToClient( closerTaxi.getKey(), posicaoCliente );
+			this.clientesEmEspera.remove( posicaoCliente );
+		}
+		
+		return closerTaxi != null;
+	}
 
+	private void sendTaxiToClient(AID taxi, Posicao posicaoCliente) {
+		
+		this.sendMessage(Messages.SEND_TAXI_TO_CLIENT, "taxi-to-client", posicaoCliente, taxi);
+		
 	}
 
 	private void createAndShowGUI() {

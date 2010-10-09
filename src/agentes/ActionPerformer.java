@@ -2,7 +2,7 @@ package agentes;
 
 public interface ActionPerformer {
 
-	void action();
+	void action() throws Exception;
 	
 	long getSleepTime();
 	

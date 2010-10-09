@@ -52,8 +52,24 @@ public class Posicao implements Serializable {
 			possibilidades.add( norte() );
 		}
 		
+		if ( this.hasNordeste() ) {
+			possibilidades.add( nordeste() );
+		}
+		
+		if ( this.hasNoroeste() ) {
+			possibilidades.add( noroeste() );
+		}
+		
 		if ( this.hasSul() ) {
 			possibilidades.add( sul() );
+		}
+		
+		if ( this.hasSudeste() ) {
+			possibilidades.add( this.sudeste() );
+		}
+		
+		if ( this.hasSudoeste() ) {
+			possibilidades.add( this.sudoeste() );
 		}
 		
 		if ( this.hasLeste() ) {
@@ -81,7 +97,23 @@ public class Posicao implements Serializable {
 	}
 	
 	public boolean hasNorte() {
-		return this.linha < HEIGHT;
+		return this.linha < (HEIGHT - 1 ) ;
+	}
+	
+	public boolean hasNordeste() {
+		return this.hasNorte() && this.hasLeste();
+	}
+	
+	public Posicao nordeste() {
+		return get( this.linha + 1, this.coluna + 1 );
+	}
+	
+	public boolean hasNoroeste() {
+		return this.hasNorte() && this.hasOeste();
+	}
+	
+	public Posicao noroeste() {
+		return get( this.linha + 1, this.coluna - 1 );
 	}
 	
 	public Posicao sul() {
@@ -90,6 +122,22 @@ public class Posicao implements Serializable {
 	
 	public boolean hasSul() {
 		return this.linha > 0;
+	}
+	
+	public boolean hasSudeste() {
+		return this.hasSul() && this.hasLeste();
+	}
+	
+	public Posicao sudeste() {
+		return get( this.linha - 1, this.coluna + 1 );
+	}
+	
+	public boolean hasSudoeste() {
+		return this.hasSul() && this.hasOeste();
+	}
+	
+	public Posicao sudoeste() {
+		return get( this.linha - 1, this.coluna - 1 );
 	}
 	
 	public Posicao oeste() {
@@ -105,7 +153,7 @@ public class Posicao implements Serializable {
 	}
 	
 	public boolean hasLeste() {
-		return this.coluna < WIDTH;
+		return this.coluna < ( WIDTH - 1);
 	}
 	
 	@Override
@@ -116,6 +164,28 @@ public class Posicao implements Serializable {
 	public String toLabel() {
 		return String.format( "%s-%s", this.linha, this.coluna );
 	}
+	
+	public Posicao melhorMovimentoPara( Posicao p ) {
+		List<Posicao> possibilidades  = this.calcularPossibilidades();
+		Posicao destino = null;
+		Double distancia = null;
+		
+		for ( Posicao possibilidade : possibilidades ) {
+			double distanciaAtual = this.distancia(p);
+			System.out.printf( "Distância: %s Distância atual: %s%n", distancia, distanciaAtual );
+			if ( distancia == null || distanciaAtual < distancia ) {
+				destino = possibilidade;
+				distancia = distanciaAtual;
+			}
+		}
+		
+		return destino;
+	}
+	
+   public double distancia( Posicao p ) {
+	   double resutlado = Math.pow( this.linha -  p.linha, 2) + Math.pow( this.coluna - p.coluna, 2 ); 
+	   return Math.sqrt(resutlado);
+   }
 	
 	public static final Posicao get( int linha, int coluna ) {
 		return new Posicao(linha, coluna);

@@ -34,4 +34,9 @@ public class Movimento implements Serializable {
 		this.destino = destino;
 	}
 	
+	@Override
+	public String toString() {
+		return String.format( "Origem: %s | Destino: %s", this.origem, this.destino );
+	}
+	
 }

@@ -6,7 +6,10 @@ import jade.domain.DFService;
 import jade.domain.FIPAException;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.lang.acl.ACLMessage;
 
+import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,6 +45,20 @@ public abstract class CyclicAgent extends Agent implements ActionPerformer {
 	public void afterSetup() {
 	}
 
+	public void sendMessage( int codigo, String conversationId, Serializable contentObject, AID... variables  ) {
+		ACLMessage mensagem = new ACLMessage( codigo );
+		for ( AID aid : variables ) {
+			mensagem.addReceiver( aid );
+		}
+		mensagem.setConversationId( conversationId );
+		try {
+			mensagem.setContentObject( contentObject );
+		} catch (IOException e) {
+			log("Falha ao enviar conteúdo da mensagem: %s", e.getMessage());
+		}
+		this.send(mensagem);		
+	}
+	
 	@Override
 	protected void takeDown() {
 		try {
