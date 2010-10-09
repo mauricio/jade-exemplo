@@ -1,10 +1,16 @@
 package agentes;
 
+import java.io.Serializable;
 import java.security.SecureRandom;
 import java.util.LinkedList;
 import java.util.List;
 
-public class Posicao {
+public class Posicao implements Serializable {
+
+	private static final int HEIGHT = 60;
+	private static final int WIDTH = 100;
+
+	private static final long serialVersionUID = 6097932789402673806L;
 
 	private static final SecureRandom RANDOM = new SecureRandom();
 	
@@ -75,7 +81,7 @@ public class Posicao {
 	}
 	
 	public boolean hasNorte() {
-		return this.linha < 100;
+		return this.linha < HEIGHT;
 	}
 	
 	public Posicao sul() {
@@ -99,7 +105,7 @@ public class Posicao {
 	}
 	
 	public boolean hasLeste() {
-		return this.coluna < 100;
+		return this.coluna < WIDTH;
 	}
 	
 	@Override
@@ -116,7 +122,7 @@ public class Posicao {
 	}
 	
 	public static final Posicao random() {
-		return get( RANDOM.nextInt(101), RANDOM.nextInt( 101 ) );
+		return get( RANDOM.nextInt(HEIGHT), RANDOM.nextInt( WIDTH ) );
 	}
 	
 	public static final Posicao load( String posicao ) {

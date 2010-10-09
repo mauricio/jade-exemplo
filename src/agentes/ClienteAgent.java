@@ -1,5 +1,7 @@
 package agentes;
 
+import java.io.IOException;
+
 import jade.core.AID;
 import jade.lang.acl.ACLMessage;
 
@@ -15,7 +17,7 @@ public class ClienteAgent extends CyclicAgent {
 	private boolean sentRequest;
 
 	public ClienteAgent() {
-		super(TYPE_CENTRAL);
+		super(TYPE_CLIENTE);
 		this.posicao = Posicao.random();
 	}
 
@@ -45,6 +47,11 @@ public class ClienteAgent extends CyclicAgent {
 		mensagem.setContent(this.posicao.toLabel());
 		mensagem.setConversationId("pedido-de-taxi");
 		mensagem.setReplyWith("pedido-" + System.currentTimeMillis());
+		try {
+			mensagem.setContentObject(this.posicao);
+		} catch (IOException e) {
+			log("Falha ao enviar conteúdo da mensagem: %s", e.getMessage());
+		}
 		this.send(mensagem);
 	}
 }
