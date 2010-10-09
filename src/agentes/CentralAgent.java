@@ -2,7 +2,6 @@ package agentes;
 
 import jade.core.AID;
 import jade.lang.acl.ACLMessage;
-import jade.lang.acl.UnreadableException;
 
 import java.awt.Color;
 import java.awt.Container;
@@ -21,13 +20,15 @@ import javax.swing.JLabel;
 public class CentralAgent extends CyclicAgent {
 
 	private static final long serialVersionUID = 64425490648521428L;
+	private static final Color STREET_COLOR = new Color(238, 238, 238);
 
 	private Map<AID, Taxi> taxis = Collections
 			.synchronizedMap(new HashMap<AID, Taxi>());
 
 	private JLabel[][] tiles = new JLabel[60][];
-	
-	private Set<Posicao> clientesEmEspera = Collections.synchronizedSet( new HashSet<Posicao>() );
+
+	private Set<Movimento> clientesEmEspera = Collections
+			.synchronizedSet(new HashSet<Movimento>());
 
 	public CentralAgent() {
 		super(TYPE_CENTRAL);
@@ -37,42 +38,39 @@ public class CentralAgent extends CyclicAgent {
 				createAndShowGUI();
 			}
 		});
-		
+
 		log("Central iniciada");
-		
+
 	}
 
 	@Override
-	public void action() {
-		
-		for ( Posicao p : this.clientesEmEspera ) {
-			this.handleTaxiRequest(p);
+	public void action() throws Exception {
+
+		for (Movimento m : this.clientesEmEspera) {
+			this.handleTaxiRequest(m);
 		}
-		
+
 		ACLMessage message = receive();
 
 		if (message != null) {
-			
+
 			switch (message.getPerformative()) {
 			case Messages.TAXI_MOVED:
-				try {
-					Movimento movimento = (Movimento) message
-							.getContentObject();
-					this.handleTaxiMoved(message.getSender(), movimento);
-				} catch (UnreadableException e) {
-					log("Falha ao ler conteúdo da mensagem: %s", e.getMessage());
-				}
-
+				this.handleTaxiMoved(message.getSender(), (Movimento) message.getContentObject());
 				break;
 			case Messages.REQUEST_TAXI_FROM_CENTRAL:
-				try {
-					Posicao posicaoCliente = (Posicao) message
-							.getContentObject();
-					this.handleTaxiRequest(posicaoCliente);
-				} catch (UnreadableException e) {
-					log("Falha ao ler conteúdo da mensagem: %s", e.getMessage());
-				}
-
+				this.handleTaxiRequest((Movimento) message.getContentObject());
+				break;
+			case Messages.GOT_CLIENT: {
+				Movimento movimento = (Movimento) message.getContentObject();
+				paint(movimento.getOrigem(), STREET_COLOR, null);
+			}
+				break;
+			case Messages.DELIVERED_CLIENT: {
+				Movimento movimento = (Movimento) message.getContentObject();
+				paint(movimento.getDestino(), Color.BLACK, null);
+				marcarTaxi( message.getSender(), false );
+			}
 				break;
 			default:
 				log("Não é possível processar a mensagem - %s", message);
@@ -95,67 +93,81 @@ public class CentralAgent extends CyclicAgent {
 			this.taxis.put(sender, taxi);
 		}
 		taxi.setPosicao(movimento.getDestino());
-		
-		// Recuperando estado anterior
-		this.tiles[movimento.getOrigem().getLinha()][movimento.getOrigem()
-				.getColuna()].setBackground(new Color(238, 238, 238));
-		this.tiles[movimento.getDestino().getLinha()][movimento.getDestino()
-				.getColuna()].setToolTipText(null);
 
-		// Atualizando estado do tile
-		Color taxiColor = taxi.isOcupado() ? Color.RED : Color.BLUE;
-		this.tiles[movimento.getDestino().getLinha()][movimento.getDestino()
-				.getColuna()].setBackground(taxiColor);
-		this.tiles[movimento.getDestino().getLinha()][movimento.getDestino()
-				.getColuna()].setToolTipText(sender.getName());
+		if ( !this.getLabel(movimento.getDestino()).getBackground().equals( Color.BLACK ) ) {
+			// Recuperando estado anterior
+			paint(movimento.getOrigem(), STREET_COLOR, null);
+			// Atualizando estado do tile
+			marcarTaxi( sender, taxi.isOcupado() );			
+		}
 
 	}
 
-	private void handleTaxiRequest(Posicao posicaoCliente) {
+	private void handleTaxiRequest(Movimento movimento) {
 
-		log("Procurando um taxi pra %s", posicaoCliente);
-		
-		this.tiles[posicaoCliente.getLinha()][posicaoCliente.getColuna()]
-				.setBackground(Color.BLACK);
+		paint(movimento.getOrigem(), Color.BLACK);
 
-		if (  !this.requestCloserTaxi(posicaoCliente) ) {
+		if (!this.requestCloserTaxi(movimento)) {
 			log("Taxi não encontrado - %s", this.taxis);
-			this.clientesEmEspera.add( posicaoCliente );
+			this.clientesEmEspera.add(movimento);
 		} else {
 			log("Taxi encontrado");
 		}
 
 	}
 
-	private boolean requestCloserTaxi(Posicao posicaoCliente) {
+	private void marcarTaxi( AID aid, boolean ocupado ) {
+		Taxi taxi = this.taxis.get( aid );
+		taxi.setOcupado(ocupado);
+		Color taxiColor = taxi.isOcupado() ? Color.RED : Color.BLUE;
+		paint( taxi.getPosicao(), taxiColor, aid.getName() );		
+	}
+	
+	private boolean requestCloserTaxi(Movimento movimento) {
 
 		Entry<AID, Taxi> closerTaxi = null;
 		Double distancia = null;
 
 		for (Entry<AID, Taxi> taxi : this.taxis.entrySet()) {
 
-			double novaDistancia = taxi.getValue().getPosicao().distancia(posicaoCliente);
+			double novaDistancia = taxi.getValue().getPosicao()
+					.distancia(movimento.getOrigem());
 
-			if ( !taxi.getValue().isOcupado() && (distancia == null || novaDistancia < distancia) ) {
+			if (!taxi.getValue().isOcupado()
+					&& (distancia == null || novaDistancia < distancia)) {
 				distancia = novaDistancia;
 				closerTaxi = taxi;
 			}
-						
+
 		}
 
-		if ( closerTaxi != null ) {
+		if (closerTaxi != null) {
 			closerTaxi.getValue().setOcupado(true);
-			sendTaxiToClient( closerTaxi.getKey(), posicaoCliente );
-			this.clientesEmEspera.remove( posicaoCliente );
+			sendTaxiToClient(closerTaxi.getKey(), movimento);
+			this.clientesEmEspera.remove(movimento);
 		}
-		
+
 		return closerTaxi != null;
 	}
 
-	private void sendTaxiToClient(AID taxi, Posicao posicaoCliente) {
-		
-		this.sendMessage(Messages.SEND_TAXI_TO_CLIENT, "taxi-to-client", posicaoCliente, taxi);
-		
+	private void sendTaxiToClient(AID taxi, Movimento movimento) {
+
+		this.sendMessage(Messages.SEND_TAXI_TO_CLIENT, "taxi-to-client",
+				movimento, taxi);
+
+	}
+
+	private void paint(Posicao posicao, Color color) {
+		getLabel(posicao).setBackground(color);
+	}
+
+	private void paint(Posicao posicao, Color color, String tooltip) {
+		getLabel(posicao).setBackground(color);
+		getLabel(posicao).setToolTipText(tooltip);
+	}
+
+	private JLabel getLabel(Posicao posicao) {
+		return this.tiles[posicao.getLinha()][posicao.getColuna()];
 	}
 
 	private void createAndShowGUI() {
@@ -171,6 +183,7 @@ public class CentralAgent extends CyclicAgent {
 			for (int j = 0; j < this.tiles[i].length; j++) {
 				JLabel tile = new JLabel();
 				tile.setOpaque(true);
+				tile.setBackground(STREET_COLOR);
 				// tile.setBorder(new LineBorder(Color.BLACK));
 				tile.setPreferredSize(new Dimension(10, 10));
 				pane.add(tile);

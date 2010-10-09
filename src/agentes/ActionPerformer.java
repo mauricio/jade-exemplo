@@ -6,4 +6,6 @@ public interface ActionPerformer {
 	
 	long getSleepTime();
 	
+	boolean continueLoop();
+	
 }

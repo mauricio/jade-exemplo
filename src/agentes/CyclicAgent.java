@@ -36,6 +36,11 @@ public abstract class CyclicAgent extends Agent implements ActionPerformer {
 	}
 	
 	@Override
+	public boolean continueLoop() {
+		return true;
+	}
+	
+	@Override
 	protected final void setup() {
 		this.addBehaviour(new ActionPerformerCyclicBehaviorAdapter(this));
 		this.register(this.type);

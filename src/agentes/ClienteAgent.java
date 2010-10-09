@@ -1,7 +1,5 @@
 package agentes;
 
-import java.io.IOException;
-
 import jade.core.AID;
 import jade.lang.acl.ACLMessage;
 
@@ -12,46 +10,59 @@ public class ClienteAgent extends CyclicAgent {
 	 */
 	private static final long serialVersionUID = -8460376681891029264L;
 
-	private Posicao posicao;
+	private Posicao origem;
+	private Posicao destino;
 
 	private boolean sentRequest;
 
 	public ClienteAgent() {
 		super(TYPE_CLIENTE);
-		this.posicao = Posicao.random();
+		this.origem = Posicao.random();
+		this.destino = Posicao.random();
 	}
 
 	@Override
-	public void action() {
+	public void action() throws Exception {
 		if (!this.sentRequest) {
-			AID central = this.getCentral();
-			if (central != null) {
-				System.out.printf("Enviando mensagem de %s pra central %s%n",
-						this.getLocalName(), central);
-				this.sentRequest = true;
-				this.sendTaxiRequest();
-			} else {
-				System.out.printf("Ainda não há uma central visível para %s%n",
-						this.getLocalName());
+			this.callTaxi();
+		}
+		
+		ACLMessage message = receive();
+		if ( message != null ) {
+			switch( message.getPerformative() ) {
+			case Messages.DELIVERED_CLIENT : {
+				Movimento m = (Movimento) message.getContentObject();
+				this.origem = m.getDestino();
+			}
 			}
 		}
+		
 	}
 
-	public Posicao getPosicao() {
-		return posicao;
+	private void callTaxi() {
+		AID central = this.getCentral();
+		if (central != null) {
+			System.out.printf("Enviando mensagem de %s pra central %s%n",
+					this.getLocalName(), central);
+			this.sentRequest = true;
+			this.sendTaxiRequest();
+		} else {
+			System.out.printf("Ainda não há uma central visível para %s%n",
+					this.getLocalName());
+		}		
 	}
-
+	
+	@Override
+	public boolean continueLoop() {
+		return !this.isAtDestination();
+	}
+	
 	private void sendTaxiRequest() {
-		ACLMessage mensagem = new ACLMessage( Messages.REQUEST_TAXI_FROM_CENTRAL );
-		mensagem.addReceiver(this.getCentral());
-		mensagem.setContent(this.posicao.toLabel());
-		mensagem.setConversationId("pedido-de-taxi");
-		mensagem.setReplyWith("pedido-" + System.currentTimeMillis());
-		try {
-			mensagem.setContentObject(this.posicao);
-		} catch (IOException e) {
-			log("Falha ao enviar conteúdo da mensagem: %s", e.getMessage());
-		}
-		this.send(mensagem);
+		sendMessage(Messages.REQUEST_TAXI_FROM_CENTRAL, "pedido-de-taxi", new Movimento( this.getAID(), origem, destino), this.getCentral());
 	}
+
+	public boolean isAtDestination() {
+		return this.origem == this.destino;
+	}
+	
 }

@@ -3,8 +3,6 @@ package agentes;
 import jade.core.AID;
 import jade.lang.acl.ACLMessage;
 
-import java.io.IOException;
-
 public class TaxiAgent extends CyclicAgent {
 
 	/**
@@ -14,7 +12,9 @@ public class TaxiAgent extends CyclicAgent {
 
 	private Posicao posicao;
 	
-	private Posicao cliente;
+	private Movimento cliente;
+	
+	private boolean levandoCliente;
 
 	public TaxiAgent() {
 		super(TYPE_TAXI);
@@ -23,7 +23,7 @@ public class TaxiAgent extends CyclicAgent {
 
 	@Override
 	public long getSleepTime() {
-		return 2000;
+		return 500;
 	}
 	
 	@Override
@@ -34,7 +34,7 @@ public class TaxiAgent extends CyclicAgent {
 			switch( message.getPerformative() ) {
 			case Messages.SEND_TAXI_TO_CLIENT :
 				log( "Indo buscar o cliente em -> %s", message );
-				this.cliente = ( Posicao ) message.getContentObject();
+				this.cliente = ( Movimento ) message.getContentObject();
 			}
 		}
 		
@@ -51,37 +51,47 @@ public class TaxiAgent extends CyclicAgent {
 	}
 
 	private void moverParaCliente() {
-		Posicao p  = this.posicao.melhorMovimentoPara(this.cliente);
-		this.sendTaxiMoved(this.posicao, p);
-		this.posicao = p;
+		if ( this.levandoCliente ) {
+			Posicao p = this.posicao.melhorMovimentoPara( this.cliente.getDestino() );
+			
+			if ( p.equals( this.cliente.getDestino() ) ) {
+				sendMessage( Messages.DELIVERED_CLIENT, "delivered-client", this.cliente, this.getCentral(), this.cliente.getAid() );
+				this.cliente = null;
+				this.levandoCliente = false;
+			} else {
+				mover(p);
+			}
+			
+		} else {
+			
+			Posicao p = this.posicao.melhorMovimentoPara( this.cliente.getOrigem() );
+			
+			if ( p.equals( this.cliente.getOrigem() ) ) {
+				sendMessage( Messages.GOT_CLIENT, "got-client", this.cliente, this.getCentral(), this.cliente.getAid() );
+				this.levandoCliente = true;
+			} else {
+				mover(p);
+			}
+			
+		}
 	}
 	
 	private void movimentoRandomico() {
-		Posicao novaPosicao = this.posicao.movimentoRandomico();
-//		System.out.printf("%s andando em %s%n de %s para %s%n",
-//				this.getLocalName(), new Date(), this.posicao, novaPosicao);
-		this.sendTaxiMoved(this.posicao, novaPosicao);
-		this.posicao = novaPosicao;
+		mover( this.posicao.movimentoRandomico() );
 	}
 
+	private void mover( Posicao p ) {
+		this.sendTaxiMoved(this.posicao, p);
+		this.posicao = p;		
+	}
+	
 	private void sendTaxiMoved( Posicao origem, Posicao destino ) {
 		AID central = this.getCentral();
 		if ( central != null ) {
-			ACLMessage mensagem = new ACLMessage( Messages.TAXI_MOVED );
-			mensagem.addReceiver(central);
-			mensagem.setConversationId("taxi-moveu");
-			Movimento m = new Movimento(origem, destino);
-			log( "Moveu-se para %s", m );
-			try {
-				mensagem.setContentObject( m );
-			} catch (IOException e) {
-				log("Falha ao enviar conteúdo da mensagem: %s", e.getMessage());
-			}
-			this.send(mensagem);			
+			sendMessage( Messages.TAXI_MOVED, "taxi-moveu", new Movimento( origem, destino ), central );		
 		} else {
-			System.out.printf("Não há central pra enviar dados - %s%n", this.getLocalName());
+			log("Não há central pra enviar dados - %s", this.getLocalName());
 		}
-
 	}
 	
 }

@@ -172,7 +172,6 @@ public class Posicao implements Serializable {
 		
 		for ( Posicao possibilidade : possibilidades ) {
 			double distanciaAtual = possibilidade.distancia(p);
-			System.out.printf( "De %s para %s Distância: %s Distância atual: %s%n", this, p, distancia, distanciaAtual );
 			if ( distancia == null || distanciaAtual < distancia ) {
 				destino = possibilidade;
 				distancia = distanciaAtual;
